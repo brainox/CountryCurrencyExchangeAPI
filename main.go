@@ -8,8 +8,17 @@ import (
 	"os"
 	"strings"
 	"time"
+	"image"
+	"image/color"
+	"image/draw"
+	"image/png"
+	"path/filepath"
+	"sort"
 
-	"country-currency-exchange-api/helpers"
+	"golang.org/x/image/font"
+	"golang.org/x/image/font/basicfont"
+	"golang.org/x/image/math/fixed"
+
 	"country-currency-exchange-api/models"
 
 	"github.com/gin-gonic/gin"
@@ -128,7 +137,7 @@ func fetchCountryData() error {
 	}
 
 	// Generate summary image (only for countries with valid GDP)
-	if err := helpers.GenerateSummaryImage(countries, timestamp); err != nil {
+	if err := generateSummaryImage(countries, timestamp); err != nil {
 		// Log error but don't fail the entire refresh
 		fmt.Printf("Warning: Failed to generate summary image: %v\n", err)
 	}
@@ -256,9 +265,141 @@ func getStatus(context *gin.Context) {
 	})
 }
 
+
+// generateSummaryImage creates a summary image with country statistics
+func generateSummaryImage(countries []models.Country, lastRefreshed string) error {
+	// Create cache directory if it doesn't exist
+	if err := os.MkdirAll("cache", 0755); err != nil {
+		return fmt.Errorf("error creating cache directory: %v", err)
+	}
+
+	// Filter countries with valid GDP (greater than 0)
+	validCountries := make([]models.Country, 0)
+	for _, country := range countries {
+		if country.EstimatedGDP > 0 {
+			validCountries = append(validCountries, country)
+		}
+	}
+
+	// Sort countries by GDP in descending order
+	sort.Slice(validCountries, func(i, j int) bool {
+		return validCountries[i].EstimatedGDP > validCountries[j].EstimatedGDP
+	})
+
+	// Get top 5 countries
+	top5 := validCountries
+	if len(validCountries) > 5 {
+		top5 = validCountries[:5]
+	}
+
+	// Create image
+	const width = 1400
+	const height = 800
+	img := image.NewRGBA(image.Rect(0, 0, width, height))
+
+	// Background color - dark blue-gray
+	bgColor := color.RGBA{30, 41, 59, 255}
+	draw.Draw(img, img.Bounds(), &image.Uniform{bgColor}, image.Point{}, draw.Src)
+
+	// Draw border
+	borderColor := color.RGBA{51, 65, 85, 255}
+	drawRect(img, 40, 40, width-40, height-40, borderColor, 2)
+
+	// Text colors
+	white := color.RGBA{255, 255, 255, 255}
+	lightGray := color.RGBA{203, 213, 225, 255}
+	green := color.RGBA{74, 222, 128, 255}
+	gray := color.RGBA{148, 163, 184, 255}
+
+	// Draw text
+	face := basicfont.Face7x13
+
+	// Title
+	drawText(img, "Countries API Summary", width/2-150, 120, white, face)
+
+	// Total countries
+	totalText := fmt.Sprintf("Total Countries in DB: %d", len(countries))
+	drawText(img, totalText, width/2-120, 200, lightGray, face)
+
+	// Top 5 header
+	drawText(img, "Top 5 Countries by Estimated GDP (USD):", width/2-220, 280, white, face)
+
+	// List top 5 countries
+	yPosition := 350
+	for i, country := range top5 {
+		// Country name
+		countryText := fmt.Sprintf("%d. %s", i+1, country.Name)
+		drawText(img, countryText, 150, yPosition, lightGray, face)
+
+		// GDP value (right-aligned)
+		gdpText := fmt.Sprintf("$%.2f", country.EstimatedGDP)
+		drawText(img, gdpText, width-400, yPosition, green, face)
+
+		yPosition += 60
+	}
+
+	// Last refreshed timestamp
+	refreshText := fmt.Sprintf("Last Refreshed: %s", lastRefreshed)
+	drawText(img, refreshText, width/2-200, height-80, gray, face)
+
+	// Save image
+	imagePath := filepath.Join("cache", "summary.png")
+	file, err := os.Create(imagePath)
+	if err != nil {
+		return fmt.Errorf("error creating image file: %v", err)
+	}
+	defer file.Close()
+
+	if err := png.Encode(file, img); err != nil {
+		return fmt.Errorf("error encoding image: %v", err)
+	}
+
+	return nil
+}
+
+// drawText draws text at the specified position
+func drawText(img *image.RGBA, text string, x, y int, col color.Color, face font.Face) {
+	point := fixed.Point26_6{X: fixed.Int26_6(x * 64), Y: fixed.Int26_6(y * 64)}
+	d := &font.Drawer{
+		Dst:  img,
+		Src:  image.NewUniform(col),
+		Face: face,
+		Dot:  point,
+	}
+	d.DrawString(text)
+}
+
+// drawRect draws a rectangle outline
+func drawRect(img *image.RGBA, x1, y1, x2, y2 int, col color.Color, thickness int) {
+	for t := 0; t < thickness; t++ {
+		// Top
+		for x := x1; x <= x2; x++ {
+			img.Set(x, y1+t, col)
+		}
+		// Bottom
+		for x := x1; x <= x2; x++ {
+			img.Set(x, y2-t, col)
+		}
+		// Left
+		for y := y1; y <= y2; y++ {
+			img.Set(x1+t, y, col)
+		}
+		// Right
+		for y := y1; y <= y2; y++ {
+			img.Set(x2-t, y, col)
+		}
+	}
+}
+
+// GetSummaryImagePath returns the path to the summary image
+func getSummaryImagePath() string {
+	return filepath.Join("cache", "summary.png")
+}
+
+
 // Handler to serve the summary image
 func getSummaryImage(context *gin.Context) {
-	imagePath := helpers.GetSummaryImagePath()
+	imagePath := getSummaryImagePath()
 
 	// Check if image exists
 	if _, err := os.Stat(imagePath); os.IsNotExist(err) {
