@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"country-currency-exchange-api/helpers"
 	"country-currency-exchange-api/models"
 
 	"github.com/gin-gonic/gin"
@@ -18,10 +19,12 @@ func main() {
 	router := gin.Default()
 	os := os.Getenv("PORT")
 
+	router.GET("/status", getStatus)
 	router.POST("/countries/refresh", refreshCountryData)
 	router.GET("/countries", getAllCountries)
 	router.GET("/countries/:name", getCountryByName)
 	router.DELETE("/countries/:name", deleteCountryByName)
+	router.GET("/countries/image", getSummaryImage)
 
 	if os != "" {
 		router.Run(":" + os)
@@ -62,7 +65,7 @@ func fetchCountryData() error {
 			Region:     rc.Region,
 			Population: rc.Population,
 			Currencies: rc.Currencies,
-			Flag:       rc.Flag, // This will be mapped to flag_url in the JSON response due to our struct tag
+			Flag:       rc.Flag,
 		}
 	}
 
@@ -110,8 +113,22 @@ func fetchCountryData() error {
 		countries[i].LastRefreshedAt = time.Now().UTC().Format(time.RFC3339)
 	}
 
+	// Set global last refreshed timestamp
+	timestamp := time.Now().UTC().Format(time.RFC3339)
+	models.SetLastRefreshedAt(timestamp)
+
 	// Save countries to database
-	return models.SaveCountries(countries)
+	if err := models.SaveCountries(countries); err != nil {
+		return err
+	}
+
+	// Generate summary image
+	if err := helpers.GenerateSummaryImage(countries, timestamp); err != nil {
+		// Log error but don't fail the entire refresh
+		fmt.Printf("Warning: Failed to generate summary image: %v\n", err)
+	}
+
+	return nil
 }
 
 // Handler to get all countries with filtering and sorting
@@ -199,8 +216,8 @@ func getCountryByName(context *gin.Context) {
 
 	// Debug: Show what we're searching for.
 	context.JSON(http.StatusNotFound, gin.H{
-		"error":            "Country not found",
-		"searched_for":     name,
+		"error":        "Country not found",
+		"searched_for": name,
 	})
 }
 
@@ -221,4 +238,29 @@ func deleteCountryByName(context *gin.Context) {
 	context.JSON(http.StatusOK, gin.H{
 		"message": fmt.Sprintf("Country '%s' deleted successfully", name),
 	})
+}
+
+// Handler to get system status
+func getStatus(context *gin.Context) {
+	totalCountries := models.GetTotalCountries()
+	lastRefreshedAt := models.GetLastRefreshedAt()
+
+	context.JSON(http.StatusOK, gin.H{
+		"total_countries":   totalCountries,
+		"last_refreshed_at": lastRefreshedAt,
+	})
+}
+
+// Handler to serve the summary image
+func getSummaryImage(context *gin.Context) {
+	imagePath := helpers.GetSummaryImagePath()
+
+	// Check if image exists
+	if _, err := os.Stat(imagePath); os.IsNotExist(err) {
+		context.JSON(http.StatusNotFound, gin.H{"error": "Summary image not found"})
+		return
+	}
+
+	// Serve the image file
+	context.File(imagePath)
 }

@@ -31,11 +31,29 @@ type Country struct {
 	CurrencyCode    string     `json:"currency_code"`
 	ExchangeRate    float64    `json:"exchange_rate"`
 	EstimatedGDP    float64    `json:"estimated_gdp"`
-	Flag            string     `json:"flag_url"` // Will be shown as flag_url in JSON response
+	Flag            string     `json:"flag_url"`
 	LastRefreshedAt string     `json:"last_refreshed_at"`
 }
 
 var countries = []Country{}
+
+// Global variable to track last refresh time
+var lastRefreshedAt string
+
+// GetTotalCountries returns the total number of countries
+func GetTotalCountries() int {
+	return len(countries)
+}
+
+// GetLastRefreshedAt returns the last refresh timestamp
+func GetLastRefreshedAt() string {
+	return lastRefreshedAt
+}
+
+// SetLastRefreshedAt updates the last refresh timestamp
+func SetLastRefreshedAt(timestamp string) {
+	lastRefreshedAt = timestamp
+}
 
 // function to compute EstimatedGDP
 func (c *Country) ComputeEstimatedGDP() {
