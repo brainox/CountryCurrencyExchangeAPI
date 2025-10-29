@@ -24,18 +24,23 @@ func GenerateSummaryImage(countries []models.Country, lastRefreshed string) erro
 		return fmt.Errorf("error creating cache directory: %v", err)
 	}
 
-	// Sort countries by GDP in descending order
-	sortedCountries := make([]models.Country, len(countries))
-	copy(sortedCountries, countries)
+	// Filter countries with valid GDP (greater than 0)
+	validCountries := make([]models.Country, 0)
+	for _, country := range countries {
+		if country.EstimatedGDP > 0 {
+			validCountries = append(validCountries, country)
+		}
+	}
 
-	sort.Slice(sortedCountries, func(i, j int) bool {
-		return sortedCountries[i].EstimatedGDP > sortedCountries[j].EstimatedGDP
+	// Sort countries by GDP in descending order
+	sort.Slice(validCountries, func(i, j int) bool {
+		return validCountries[i].EstimatedGDP > validCountries[j].EstimatedGDP
 	})
 
 	// Get top 5 countries
-	top5 := sortedCountries
-	if len(sortedCountries) > 5 {
-		top5 = sortedCountries[:5]
+	top5 := validCountries
+	if len(validCountries) > 5 {
+		top5 = validCountries[:5]
 	}
 
 	// Create image

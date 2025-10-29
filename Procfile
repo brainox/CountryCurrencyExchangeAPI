@@ -1,0 +1,1 @@
+web: bin/country-currency-exchange-api

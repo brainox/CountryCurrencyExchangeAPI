@@ -28,9 +28,9 @@ type Country struct {
 	Region          string     `json:"region"`
 	Population      int64      `json:"population"`
 	Currencies      []Currency `json:"-"`
-	CurrencyCode    string     `json:"currency_code"`
-	ExchangeRate    float64    `json:"exchange_rate"`
-	EstimatedGDP    float64    `json:"estimated_gdp"`
+	CurrencyCode    string     `json:"currency_code,omitempty"`
+	ExchangeRate    float64    `json:"exchange_rate,omitempty"`
+	EstimatedGDP    float64    `json:"estimated_gdp,omitempty"`
 	Flag            string     `json:"flag_url"`
 	LastRefreshedAt string     `json:"last_refreshed_at"`
 }
@@ -55,17 +55,15 @@ func SetLastRefreshedAt(timestamp string) {
 	lastRefreshedAt = timestamp
 }
 
-// function to compute EstimatedGDP
+// ComputeEstimatedGDP function to compute EstimatedGDP
 func (c *Country) ComputeEstimatedGDP() {
-	// Use this formular: estimated_gdp = population × random(1000–2000) ÷ exchange_rate.
-	randomFactor := float64(rand.Intn(1001) + 1000) // random number between 1000 and 2000
-
-	// Ensure we have a valid exchange rate to prevent division by zero
-	if c.ExchangeRate <= 0 {
-		c.ExchangeRate = 1.0
+	// Only compute if we have valid currency and exchange rate
+	if c.CurrencyCode != "" && c.ExchangeRate > 0 {
+		randomFactor := float64(rand.Intn(1001) + 1000) // random number between 1000 and 2000
+		c.EstimatedGDP = float64(c.Population) * randomFactor / c.ExchangeRate
+	} else {
+		c.EstimatedGDP = 0
 	}
-
-	c.EstimatedGDP = float64(c.Population) * randomFactor / c.ExchangeRate
 }
 
 // save country to database

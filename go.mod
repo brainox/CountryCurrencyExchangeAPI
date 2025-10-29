@@ -2,8 +2,6 @@ module country-currency-exchange-api
 
 go 1.24.0
 
-toolchain go1.24.9
-
 require (
 	github.com/bytedance/sonic v1.14.0 // indirect
 	github.com/bytedance/sonic/loader v0.3.0 // indirect

@@ -85,29 +85,34 @@ func fetchCountryData() error {
 
 	// Process each country
 	for i := range countries {
-
 		// Increment the country ID using index + 1
 		countries[i].ID = uint(i + 1)
 
-		// Get the first currency code for the country
+		// Handle currency code
 		if len(countries[i].Currencies) > 0 {
+			// Get the first currency code
 			countries[i].CurrencyCode = countries[i].Currencies[0].Code
-			// Get exchange rate (defaulting to 1.0 if not found)
-			countries[i].ExchangeRate = exchangeData.Rates[countries[i].CurrencyCode]
-			if countries[i].ExchangeRate <= 0 {
-				countries[i].ExchangeRate = 1.0
+
+			// Try to get exchange rate from the API
+			if rate, exists := exchangeData.Rates[countries[i].CurrencyCode]; exists && rate > 0 {
+				countries[i].ExchangeRate = rate
+
+				// Generate random GDP multiplier between 1000 and 2000
+				multiplier := 1000.0 + rand.Float64()*1000.0
+
+				// Calculate estimated GDP
+				countries[i].EstimatedGDP = float64(countries[i].Population) * multiplier / countries[i].ExchangeRate
+			} else {
+				// Currency code not found in exchange rates API
+				countries[i].ExchangeRate = 0    // Will be stored as null
+				countries[i].EstimatedGDP = 0    // Will be stored as null
 			}
 		} else {
-			// If no currency is found, use default values
-			countries[i].CurrencyCode = "USD"
-			countries[i].ExchangeRate = 1.0
+			// No currencies available for this country
+			countries[i].CurrencyCode = ""       // Will be stored as null
+			countries[i].ExchangeRate = 0        // Will be stored as null
+			countries[i].EstimatedGDP = 0        // Will be stored as 0
 		}
-
-		// Generate random GDP multiplier between 1000 and 2000
-		multiplier := 1000.0 + rand.Float64()*1000.0
-
-		// Calculate estimated GDP
-		countries[i].EstimatedGDP = float64(countries[i].Population) * multiplier / countries[i].ExchangeRate
 
 		// Set last refreshed timestamp
 		countries[i].LastRefreshedAt = time.Now().UTC().Format(time.RFC3339)
@@ -122,7 +127,7 @@ func fetchCountryData() error {
 		return err
 	}
 
-	// Generate summary image
+	// Generate summary image (only for countries with valid GDP)
 	if err := helpers.GenerateSummaryImage(countries, timestamp); err != nil {
 		// Log error but don't fail the entire refresh
 		fmt.Printf("Warning: Failed to generate summary image: %v\n", err)
