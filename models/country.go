@@ -1,9 +1,11 @@
 package models
 
 import (
+	"fmt"
 	"math/rand"
 	"strings"
-	"fmt"
+
+	"country-currency-exchange-api/database"
 )
 
 // Temporary struct to match the restcountries.com API response
@@ -22,7 +24,7 @@ type Currency struct {
 }
 
 type Country struct {
-	ID              uint       `json:"id"`
+	ID              int64      `json:"id" db:"id"`
 	Name            string     `json:"name"`
 	Capital         string     `json:"capital"`
 	Region          string     `json:"region"`
@@ -66,29 +68,97 @@ func (c *Country) ComputeEstimatedGDP() {
 	}
 }
 
-// save country to database
-func (c Country) Save() {
-	// Implementation for saving country to database goes here.
-	countries = append(countries, c)
-}
-
 // get all countries from database
 func GetAllCountries() []Country {
-	// Implementation for retrieving all countries from database goes here.
+	query := `SELECT 
+		id, name, capital, region, population,
+		currency_code, exchange_rate, estimated_gdp,
+		flag_url, last_refreshed_at 
+	FROM countries`
+
+	rows, err := database.DB.Query(query)
+	if err != nil {
+		fmt.Printf("Error querying countries: %v\n", err)
+		return nil
+	}
+	defer rows.Close()
+
+	var countries []Country
+	for rows.Next() {
+		var country Country
+		err := rows.Scan(
+			&country.ID,
+			&country.Name,
+			&country.Capital,
+			&country.Region,
+			&country.Population,
+			&country.CurrencyCode,
+			&country.ExchangeRate,
+			&country.EstimatedGDP,
+			&country.Flag,
+			&country.LastRefreshedAt,
+		)
+		if err != nil {
+			fmt.Printf("Error scanning country: %v\n", err)
+			continue
+		}
+		countries = append(countries, country)
+	}
+
+	if err = rows.Err(); err != nil {
+		fmt.Printf("Error iterating rows: %v\n", err)
+		return nil
+	}
+
 	return countries
 }
 
 // SaveCountries saves multiple countries to the database
 func SaveCountries(newCountries []Country) error {
-	// For now, just replace the in-memory countries slice
-	countries = newCountries
+	// Clear existing data
+	_, err := database.DB.Exec("DELETE FROM countries")
+	if err != nil {
+		return fmt.Errorf("error clearing existing countries: %v", err)
+	}
+
+	// Prepare the insert statement
+	stmt, err := database.DB.Prepare(`
+		INSERT INTO countries (
+			name, capital, region, population, 
+			currency_code, exchange_rate, estimated_gdp, 
+			flag_url, last_refreshed_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`)
+	if err != nil {
+		return fmt.Errorf("error preparing statement: %v", err)
+	}
+	defer stmt.Close()
+
+	// Insert each country
+	for _, country := range newCountries {
+		_, err := stmt.Exec(
+			country.Name,
+			country.Capital,
+			country.Region,
+			country.Population,
+			country.CurrencyCode,
+			country.ExchangeRate,
+			country.EstimatedGDP,
+			country.Flag,
+			country.LastRefreshedAt,
+		)
+		if err != nil {
+			return fmt.Errorf("error inserting country %s: %v", country.Name, err)
+		}
+	}
+
 	return nil
 }
 
 // DeleteCountryByName removes a country from the database by name (case-insensitive)
 func DeleteCountryByName(name string) error {
 	searchName := strings.ToLower(strings.TrimSpace(name))
-	
+
 	for i := range countries {
 		countryName := strings.ToLower(strings.TrimSpace(countries[i].Name))
 		if countryName == searchName {
@@ -97,6 +167,6 @@ func DeleteCountryByName(name string) error {
 			return nil
 		}
 	}
-	
+
 	return fmt.Errorf("country not found")
 }

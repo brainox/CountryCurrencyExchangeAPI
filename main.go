@@ -3,28 +3,31 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"math/rand"
-	"net/http"
-	"os"
-	"strings"
-	"time"
 	"image"
 	"image/color"
 	"image/draw"
 	"image/png"
+	"math/rand"
+	"net/http"
+	"os"
 	"path/filepath"
 	"sort"
+	"strings"
+	"time"
 
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/basicfont"
 	"golang.org/x/image/math/fixed"
 
+	"country-currency-exchange-api/database"
 	"country-currency-exchange-api/models"
 
 	"github.com/gin-gonic/gin"
 )
 
 func main() {
+	// initialize the database
+	database.InitDB()
 	router := gin.Default()
 	os := os.Getenv("PORT")
 
@@ -95,7 +98,7 @@ func fetchCountryData() error {
 	// Process each country
 	for i := range countries {
 		// Increment the country ID using index + 1
-		countries[i].ID = uint(i + 1)
+		countries[i].ID = int64(i + 1)
 
 		// Handle currency code
 		if len(countries[i].Currencies) > 0 {
@@ -113,14 +116,14 @@ func fetchCountryData() error {
 				countries[i].EstimatedGDP = float64(countries[i].Population) * multiplier / countries[i].ExchangeRate
 			} else {
 				// Currency code not found in exchange rates API
-				countries[i].ExchangeRate = 0    // Will be stored as null
-				countries[i].EstimatedGDP = 0    // Will be stored as null
+				countries[i].ExchangeRate = 0 // Will be stored as null
+				countries[i].EstimatedGDP = 0 // Will be stored as null
 			}
 		} else {
 			// No currencies available for this country
-			countries[i].CurrencyCode = ""       // Will be stored as null
-			countries[i].ExchangeRate = 0        // Will be stored as null
-			countries[i].EstimatedGDP = 0        // Will be stored as 0
+			countries[i].CurrencyCode = "" // Will be stored as null
+			countries[i].ExchangeRate = 0  // Will be stored as null
+			countries[i].EstimatedGDP = 0  // Will be stored as 0
 		}
 
 		// Set last refreshed timestamp
@@ -265,7 +268,6 @@ func getStatus(context *gin.Context) {
 	})
 }
 
-
 // generateSummaryImage creates a summary image with country statistics
 func generateSummaryImage(countries []models.Country, lastRefreshed string) error {
 	// Create cache directory if it doesn't exist
@@ -395,7 +397,6 @@ func drawRect(img *image.RGBA, x1, y1, x2, y2 int, col color.Color, thickness in
 func getSummaryImagePath() string {
 	return filepath.Join("cache", "summary.png")
 }
-
 
 // Handler to serve the summary image
 func getSummaryImage(context *gin.Context) {
