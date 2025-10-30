@@ -1,1 +1,1 @@
-GET http://localhost:8080/countries?region=asia&currency=INR&sort=gdp_desc
+GET http://localhost:8080/countries?region=europe&sort=gdp_desc

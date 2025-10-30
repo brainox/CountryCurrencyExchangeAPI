@@ -1,29 +1,2 @@
 POST http://localhost:8080/countries/refresh
 Content-Type: application/json
-
-# [
-#   {
-#     "id": 1,
-#     "name": "Nigeria",
-#     "capital": "Abuja",
-#     "region": "Africa",
-#     "population": 206139589,
-#     "currency_code": "NGN",
-#     "exchange_rate": 1600.23,
-#     "estimated_gdp": 25767448125.2,
-#     "flag_url": "https://flagcdn.com/ng.svg",
-#     "last_refreshed_at": "2025-10-22T18:00:00Z"
-#   },
-#   {
-#     "id": 2,
-#     "name": "Ghana",
-#     "capital": "Accra",
-#     "region": "Africa",
-#     "population": 31072940,
-#     "currency_code": "GHS",
-#     "exchange_rate": 15.34,
-#     "estimated_gdp": 3029834520.6,
-#     "flag_url": "https://flagcdn.com/gh.svg",
-#     "last_refreshed_at": "2025-10-22T18:00:00Z"
-#   }
-# ]

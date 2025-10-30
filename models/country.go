@@ -24,7 +24,7 @@ type Currency struct {
 }
 
 type Country struct {
-	ID              int64      `json:"id" db:"id"`
+	ID              int64      `json:"id"`
 	Name            string     `json:"name"`
 	Capital         string     `json:"capital"`
 	Region          string     `json:"region"`
